@@ -43,7 +43,7 @@ jobs:
               raise SystemExit("modDesc.xml has no version")
 
           lua = pathlib.Path("scripts/CropCalendarSort.lua").read_text(encoding="utf-8")
-          match = re.search(r'CCS\\.VERSION\\s*=\\s*"([^"]+)"', lua)
+          match = re.search(r'CCS\.VERSION\s*=\s*"([^"]+)"', lua)
           if match is None:
               raise SystemExit("Could not find CCS.VERSION in CropCalendarSort.lua")
 
