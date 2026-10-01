@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
   pull_request:
   workflow_dispatch:
 
@@ -19,14 +17,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
 
       - name: Validate source and versions
         shell: python
         run: |
-          import os
           import pathlib
           import re
-          import sys
           import xml.etree.ElementTree as ET
 
           required = [
@@ -45,7 +43,7 @@ jobs:
               raise SystemExit("modDesc.xml has no version")
 
           lua = pathlib.Path("scripts/CropCalendarSort.lua").read_text(encoding="utf-8")
-          match = re.search(r'CCS\.VERSION\s*=\s*"([^"]+)"', lua)
+          match = re.search(r'CCS\\.VERSION\\s*=\\s*"([^"]+)"', lua)
           if match is None:
               raise SystemExit("Could not find CCS.VERSION in CropCalendarSort.lua")
 
@@ -61,21 +59,15 @@ jobs:
           if b"DXT5" not in icon[:128]:
               raise SystemExit("icon_CropCalendarSort.dds is not DXT5-compressed")
 
-          ref_type = os.environ.get("GITHUB_REF_TYPE", "")
-          ref_name = os.environ.get("GITHUB_REF_NAME", "")
-          if ref_type == "tag":
-              expected_tag = "v" + version
-              if ref_name != expected_tag:
-                  raise SystemExit(
-                      f"Release tag mismatch: tag={ref_name}, expected={expected_tag}"
-                  )
-
           print(f"Validated Crop Calendar Sort {version}")
 
       - name: Package FS25 mod
         run: |
           rm -f FS25_CropCalendarSort.zip
-          zip -r FS25_CropCalendarSort.zip             modDesc.xml             icon_CropCalendarSort.dds             scripts
+          zip -r FS25_CropCalendarSort.zip \
+            modDesc.xml \
+            icon_CropCalendarSort.dds \
+            scripts
           unzip -t FS25_CropCalendarSort.zip
           test "$(unzip -Z1 FS25_CropCalendarSort.zip | head -n 1)" = "modDesc.xml"
 
@@ -86,14 +78,59 @@ jobs:
           path: FS25_CropCalendarSort.zip
           if-no-files-found: error
 
-      - name: Publish tagged release
-        if: startsWith(github.ref, 'refs/tags/v')
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Detect release request
+        id: release
+        shell: bash
         run: |
+          echo "publish=false" >> "$GITHUB_OUTPUT"
+
+          if [ "$GITHUB_EVENT_NAME" != "push" ]; then
+            exit 0
+          fi
+
+          if [ ! -f .release/READY ]; then
+            exit 0
+          fi
+
+          BEFORE="${{ github.event.before }}"
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            exit 0
+          fi
+
+          if ! git diff --name-only "$BEFORE" "$GITHUB_SHA" | grep -qx ".release/READY"; then
+            exit 0
+          fi
+
           VERSION="$(python - <<'PY'
           import xml.etree.ElementTree as ET
           print(ET.parse("modDesc.xml").getroot().findtext("version").strip())
           PY
           )"
-          gh release create "$GITHUB_REF_NAME"             FS25_CropCalendarSort.zip             --verify-tag             --title "Crop Calendar Sort $VERSION"             --generate-notes
+
+          REQUESTED="$(tr -d '[:space:]' < .release/READY)"
+          if [ "$REQUESTED" != "$VERSION" ]; then
+            echo "Release marker requests '$REQUESTED' but modDesc.xml is '$VERSION'" >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Publish release
+        if: steps.release.outputs.publish == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG already exists" >&2
+            exit 1
+          fi
+
+          gh release create "$TAG" \
+            FS25_CropCalendarSort.zip \
+            --target "$GITHUB_SHA" \
+            --title "Crop Calendar Sort $VERSION" \
+            --generate-notes
