@@ -2,7 +2,7 @@
 
 A lightweight Farming Simulator 25 quality-of-life mod that adds selectable sorting modes to the **native crop calendar**.
 
-Current development version: **0.3.0.0**
+Current version: **0.3.0.0**
 
 ## What it does
 
@@ -74,8 +74,8 @@ GitHub Actions validates the source and creates:
 
 on pushes and pull requests.
 
-To publish a GitHub release, create and push a version tag matching `modDesc.xml`, for example:
+To publish a GitHub release, update `.release/READY` so its contents exactly match the version in `modDesc.xml`, for example:
 
-`v0.3.0.0`
+`0.3.0.0`
 
-The release workflow validates that the tag, `modDesc.xml` version and `CCS.VERSION` all agree before publishing the ZIP.
+The workflow validates that `modDesc.xml` and `CCS.VERSION` agree, builds the ZIP, creates the matching `v<version>` tag, and publishes the GitHub release automatically.
