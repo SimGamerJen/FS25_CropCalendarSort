@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<modDesc descVersion="114">
+    <author>SimGamerJen</author>
+    <version>0.3.0.0</version>
+
+    <title>
+        <en>Crop Calendar Sort</en>
+    </title>
+
+    <description>
+        <en><![CDATA[
+Crop Calendar Sort is a Farming Simulator 25 quality-of-life mod that adds selectable ordering modes to the standard in-game crop calendar.
+
+Open the normal crop calendar and use the SORT menu action to choose how its rows are ordered.
+
+Sort modes:
+- Native Order: restores the order supplied by the game/map.
+- Alphabetical A-Z: sorts every calendar entry by its displayed/localised crop name.
+- Plantable A-Z: puts crops which allow seeding first, alphabetically, followed by the remaining entries alphabetically.
+- Planting Start: sorts by the first planting period, with A-Z as the tie-breaker.
+- Harvest Start: sorts by the first harvest period, with A-Z as the tie-breaker.
+- Plant Now: puts crops plantable in the current seasonal period first, A-Z within each group.
+- Harvest Now: puts crops harvestable in the current seasonal period first, A-Z within each group.
+- Next Planting: sorts by the nearest planting opportunity from the current period, wrapping through the year.
+- Next Harvest: sorts by the nearest harvest opportunity from the current period, wrapping through the year.
+
+The selected mode is stored as a player preference under modSettings and applies across savegames.
+
+The mod changes only the presentation order of the native crop calendar. It does not modify crop definitions, planting windows, growth states, fields, contracts or savegame data.
+
+Version 0.3.0.0:
+- Added Plant Now and Harvest Now gameplay-focused sort modes.
+- Added Next Planting and Next Harvest rolling seasonal sort modes.
+- Current-period modes use the active FS25 seasonal period and safely fall back to A-Z if it cannot be resolved.
+- Retained Native, A-Z, Plantable A-Z, Planting Start and Harvest Start modes.
+- Uses the stock FS25 OptionDialog directly.
+- Persistent player preference storage remains enabled.
+]]></en>
+    </description>
+
+    <iconFilename>icon_CropCalendarSort.dds</iconFilename>
+    <multiplayer supported="true"/>
+
+    <extraSourceFiles>
+        <sourceFile filename="scripts/CropCalendarSort.lua"/>
+    </extraSourceFiles>
+</modDesc>

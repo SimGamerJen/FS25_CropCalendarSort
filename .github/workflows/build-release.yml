@@ -1,0 +1,99 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  validate-package-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate source and versions
+        shell: python
+        run: |
+          import os
+          import pathlib
+          import re
+          import sys
+          import xml.etree.ElementTree as ET
+
+          required = [
+              pathlib.Path("modDesc.xml"),
+              pathlib.Path("icon_CropCalendarSort.dds"),
+              pathlib.Path("scripts/CropCalendarSort.lua"),
+          ]
+
+          missing = [str(path) for path in required if not path.is_file()]
+          if missing:
+              raise SystemExit("Missing required files: " + ", ".join(missing))
+
+          root = ET.parse("modDesc.xml").getroot()
+          version = (root.findtext("version") or "").strip()
+          if not version:
+              raise SystemExit("modDesc.xml has no version")
+
+          lua = pathlib.Path("scripts/CropCalendarSort.lua").read_text(encoding="utf-8")
+          match = re.search(r'CCS\.VERSION\s*=\s*"([^"]+)"', lua)
+          if match is None:
+              raise SystemExit("Could not find CCS.VERSION in CropCalendarSort.lua")
+
+          runtime_version = match.group(1)
+          if runtime_version != version:
+              raise SystemExit(
+                  f"Version mismatch: modDesc.xml={version}, CCS.VERSION={runtime_version}"
+              )
+
+          icon = pathlib.Path("icon_CropCalendarSort.dds").read_bytes()
+          if icon[:4] != b"DDS ":
+              raise SystemExit("icon_CropCalendarSort.dds is not a DDS file")
+          if b"DXT5" not in icon[:128]:
+              raise SystemExit("icon_CropCalendarSort.dds is not DXT5-compressed")
+
+          ref_type = os.environ.get("GITHUB_REF_TYPE", "")
+          ref_name = os.environ.get("GITHUB_REF_NAME", "")
+          if ref_type == "tag":
+              expected_tag = "v" + version
+              if ref_name != expected_tag:
+                  raise SystemExit(
+                      f"Release tag mismatch: tag={ref_name}, expected={expected_tag}"
+                  )
+
+          print(f"Validated Crop Calendar Sort {version}")
+
+      - name: Package FS25 mod
+        run: |
+          rm -f FS25_CropCalendarSort.zip
+          zip -r FS25_CropCalendarSort.zip             modDesc.xml             icon_CropCalendarSort.dds             scripts
+          unzip -t FS25_CropCalendarSort.zip
+          test "$(unzip -Z1 FS25_CropCalendarSort.zip | head -n 1)" = "modDesc.xml"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: FS25_CropCalendarSort
+          path: FS25_CropCalendarSort.zip
+          if-no-files-found: error
+
+      - name: Publish tagged release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="$(python - <<'PY'
+          import xml.etree.ElementTree as ET
+          print(ET.parse("modDesc.xml").getroot().findtext("version").strip())
+          PY
+          )"
+          gh release create "$GITHUB_REF_NAME"             FS25_CropCalendarSort.zip             --verify-tag             --title "Crop Calendar Sort $VERSION"             --generate-notes
